@@ -159,36 +159,83 @@ def write_voc_results_file(all_boxes, dataset):
                                    dets[k, 2] + 1, dets[k, 3] + 1))
 
 
-def do_python_eval(output_dir='output', use_07=True):
+import os
+import numpy as np
+import pickle
+
+def do_python_eval(output_dir='output', use_07=True, result_file='/content/al-mdn/eval/results.txt'):
     cachedir = os.path.join(devkit_path, 'annotations_cache')
     aps = []
-    # The PASCAL VOC metric changed in 2010
     use_07_metric = use_07
-    print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
+
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
-    for i, cls in enumerate(labelmap):
-        filename = get_voc_results_file_template(set_type, cls)
-        rec, prec, ap = voc_eval(
-           filename, annopath, imgsetpath.format(set_type), cls, cachedir,
-           ovthresh=0.5, use_07_metric=use_07_metric)
-        aps += [ap]
-        print('AP for {} = {:.4f}'.format(cls, ap))
-        with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
-            pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-    print('Mean AP = {:.4f}'.format(np.mean(aps)))
-    print('~~~~~~~~')
-    print('Results:')
-    for ap in aps:
-        print('{:.3f}'.format(ap))
-    print('{:.3f}'.format(np.mean(aps)))
-    print('~~~~~~~~')
-    print('')
-    print('--------------------------------------------------------------')
-    print('Results computed with the **unofficial** Python eval code.')
-    print('Results should be very close to the official MATLAB eval code.')
-    print('--------------------------------------------------------------')
-    return np.mean(aps)
+
+    # Create the directory for the result file if it doesn't exist
+    result_dir = os.path.dirname(result_file)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
+
+    # Open the result file in append mode to allow multiple runs
+    with open(result_file, 'a') as rf:
+        # Write the separator line to distinguish between different runs
+        rf.write('\n' + '='*50 + '\n')
+        rf.write('New evaluation run\n')
+        rf.write('='*50 + '\n\n')
+
+        print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
+        rf.write('VOC07 metric? ' + ('Yes\n' if use_07_metric else 'No\n'))
+
+        for i, cls in enumerate(labelmap):
+            filename = get_voc_results_file_template(set_type, cls)
+            rec, prec, ap = voc_eval(
+                filename, annopath, imgsetpath.format(set_type), cls, cachedir,
+                ovthresh=0.5, use_07_metric=use_07_metric)
+            aps += [ap]
+
+            print('AP for {} = {:.4f}'.format(cls, ap))
+            rf.write('AP for {} = {:.4f}\n'.format(cls, ap))
+
+            # Save rec, prec, ap using pickle
+            with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
+                pickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+
+        mean_ap = np.mean(aps)
+        print('Mean AP = {:.4f}'.format(mean_ap))
+        rf.write('Mean AP = {:.4f}\n'.format(mean_ap))
+
+        print('~~~~~~~~')
+        rf.write('~~~~~~~~\n')
+
+        print('Results:')
+        rf.write('Results:\n')
+
+        for ap in aps:
+            print('{:.3f}'.format(ap))
+            rf.write('{:.3f}\n'.format(ap))
+
+        print('{:.3f}'.format(mean_ap))
+        rf.write('{:.3f}\n'.format(mean_ap))
+
+        print('~~~~~~~~')
+        rf.write('~~~~~~~~\n')
+
+        print('')
+        rf.write('\n')
+
+        print('--------------------------------------------------------------')
+        rf.write('--------------------------------------------------------------\n')
+
+        print('Results computed with the **unofficial** Python eval code.')
+        rf.write('Results computed with the **unofficial** Python eval code.\n')
+
+        print('Results should be very close to the official MATLAB eval code.')
+        rf.write('Results should be very close to the official MATLAB eval code.\n')
+
+        print('--------------------------------------------------------------')
+        rf.write('--------------------------------------------------------------\n')
+
+    return mean_ap
 
 
 def voc_ap(rec, prec, use_07_metric=True):
